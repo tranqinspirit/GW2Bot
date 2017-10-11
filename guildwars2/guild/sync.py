@@ -195,7 +195,9 @@ class SyncGuild:
                 pass
         for role in newranks:
             newrole = await guild.create_role(
-                name=role, reason="GW2Bot Sync Role")
+                name=role,
+                reason="GW2Bot Sync Role",
+                color=discord.Color(self.embed_color))
             newsaved[role] = newrole.id
         await self.bot.database.set_guild(guild, {"sync.ranks": newsaved},
                                           self)
