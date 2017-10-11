@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 from discord.ext.commands.cooldowns import BucketType
 
-from .exceptions import APIError, APIForbidden, APINotFound
+from ..exceptions import APIError, APIForbidden, APINotFound
 
 
 class GeneralGuild:
