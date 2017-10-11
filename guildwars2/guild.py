@@ -329,15 +329,18 @@ class GuildMixin:
         except APIError as e:
             return await self.error_handler(ctx, e)
         for rank in ranks:
-            discordrole = discord.utils.get(
-                ctx.guild.roles, id=doc["sync"]["ranks"][rank["id"]])
-            if discordrole:
-                existingranks.append(discordrole)
-                newsaved[rank["id"]] = discordrole.id
-            else:
+            try:
+                discordrole = discord.utils.get(
+                    ctx.guild.roles, id=doc["sync"]["ranks"][rank["id"]])
+                if discordrole:
+                    existingranks.append(discordrole)
+                    newsaved[rank["id"]] = discordrole.id
+                else:
+                    newranks.append(rank["id"])
+            except KeyError:
                 newranks.append(rank["id"])
-        for role in savedranks:
-            discordrole = discord.utils.get(ctx.guild.roles, id=rank)
+        for role_id in savedranks.values():
+            discordrole = discord.utils.get(ctx.guild.roles, id=role_id)
             currentranks.append(discordrole)
         todelete = set(currentranks) - set(existingranks)
         for rank in todelete:
@@ -380,9 +383,9 @@ class GuildMixin:
             return await ctx.send(
                 "You need to run setup before you can synchronize.")
         await ctx.trigger_typing()
+        await self.sync_ranks(ctx)
         doc = await self.bot.database.get_guild(ctx.guild)
         await self.sync_members(doc)
-        await self.sync_ranks(ctx)
         await ctx.send("Done.")
 
     async def getmembers(self, leader, guild_id):
@@ -403,8 +406,8 @@ class GuildMixin:
         gw2members = await self.getmembers(leader, gid)
         guildranks = guilddoc.get("ranks", False)
         rolelist = []
-        for rank in guildranks:
-            discordrole = discord.utils.get(guild.roles, id=rank)
+        for role_id in guildranks.values():
+            discordrole = discord.utils.get(guild.roles, id=role_id)
             rolelist.append(discordrole)
         if gw2members is not None:
             for member in guild.members:
