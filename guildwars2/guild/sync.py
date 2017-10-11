@@ -153,6 +153,8 @@ class SyncGuild:
             "In case of issues, refer to this message - you can also find it "
             "on the website https://gw2bot.info under FAQ")
         await ctx.send(guidelines)
+        doc = await self.bot.database.get_guild(ctx.guild)
+        await self.sync_members(doc)
 
     async def sync_ranks(self, guild):
         """Resynchronizes discord roles to ingame ranks."""
