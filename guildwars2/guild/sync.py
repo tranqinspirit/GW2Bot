@@ -313,15 +313,20 @@ class SyncGuild:
             self.log.debug("Unable to obtain member list for {0} server.".
                            format(guild.name))
 
-    async def synchronizer(self):
+    async def guild_synchronizer(self):
         while self is self.bot.get_cog("GuildWars2"):
             cursor = self.bot.database.get_guilds_cursor({
                 "sync.on": True,
                 "sync.setupdone": True
             }, self)
             async for doc in cursor:
-                await self.sync_members(doc)
-                await asyncio.sleep(600)
+                try:
+                    await self.sync_members(doc)
+                except Exception as e:
+                    self.log.exception(
+                        "Exception during guildsync: ", exc_info=e)
+                await asyncio.sleep(5)
+            await asyncio.sleep(60)
 
     def sync_enabled(self, doc):
         try:
