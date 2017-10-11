@@ -172,13 +172,9 @@ class GuildMixin:
         correct role in discord."""
         if ctx.invoked_subcommand is None:
             await self.bot.send_cmd_help(ctx)
-            doc = await self.bot.database.get_guild(ctx.guild, self)
-            await ctx.send(doc)
-
 
     async def clearsync(self, ctx):
         doc = await self.bot.database.get_guild(ctx.guild, self)
-        guildroles = ctx.guild.roles
         ranks = doc["sync"].get("ranks")
         for rank in ranks:
             roleobject = discord.utils.get(ctx.guild.roles, id=ranks[rank])
@@ -188,7 +184,7 @@ class GuildMixin:
                 await ctx.send(
                     "Don't have permission to delete {0}".format(rank))
             except AttributeError:
-                #role doesn't exist anymore?
+                # role doesn't exist anymore?
                 pass
         await self.bot.database.set_guild(ctx.guild, {
             "sync.ranks": {},
@@ -207,7 +203,7 @@ class GuildMixin:
             await ctx.send("No settings to clear.")
             return
         await self.clearsync(ctx)
-        await ctx.send("Done.")
+        await ctx.send("Your settings have been wiped and sync disabled.")
 
     @guildsync.command(name="setup")
     async def sync_setup(self, ctx):
@@ -236,21 +232,19 @@ class GuildMixin:
                 answer = await self.bot.wait_for(
                     "message", timeout=30, check=check)
             except asyncio.TimeoutError:
-                await message.edit(content="No response in time")
-                return
+                return await message.edit(content="No response in time")
             if answer.content.lower() != "yes":
                 return
             else:
                 await self.clearsync(ctx)
         message = await ctx.send(
-            "Please enter the name of the in-game guild you want to sync "
+            "Please type the name of the in-game guild you want to sync "
             "to. Please ensure you respond with it exactly as it is in-game.")
         try:
             answer = await self.bot.wait_for(
                 "message", timeout=30, check=check)
         except asyncio.TimeoutError:
-            await message.edit(content="No response in time")
-            return
+            return await message.edit(content="No response in time")
         scopes = ["guilds"]
         endpoint_id = "guild/search?name=" + answer.content.replace(' ', '%20')
         try:
@@ -289,9 +283,28 @@ class GuildMixin:
             "sync.on": True,
             "sync.gid": guild_id
         }, self)
+        guidelines = (
+            "Guild sync requires leader permissions in game\n"
+            "Guild sync is tied to your account. If you remove your API key, "
+            "guild sync will break\n"
+            "**Always ensure that GW2Bot is above the synced roles, or the "
+            "bot won't be able to assign them**\n"
+            "You can modify and change permissions of the roles created by "
+            "the bot - but don't delete them. In case you do delete them "
+            "$guildsync now will regenerate them for you.\n"
+            "Only server members with API key added to the bot will "
+            "participate in the sync, and no input is required from them. "
+            "New members which add their API key after sync is "
+            "setup will also be synced automatically.\n"
+            "Guild sync isn't instant - it can take even 30 minutes before "
+            "your settings are synced. To force a sync, you can use "
+            "**guildsync now**\n")
         await ctx.send(
             "Setup complete, you can toggle the synchronization on and off "
-            "at any time with $guildsync toggle on/off. If you create or delete in-game ranks, resync them with &guildsync ranks")
+            "at any time with $guildsync toggle on/off. Now, some guidelines. "
+            "In case of issues, refer to this message - you can also find it "
+            "on the website https://gw2bot.info under FAQ")
+        await ctx.send(guidelines)
 
     async def sync_ranks(self, ctx):
         """Resynchronizes discord roles to ingame ranks."""
@@ -301,7 +314,6 @@ class GuildMixin:
             await ctx.send(
                 "You need to run setup before you can use this command.")
             return
-        discordroles = ctx.guild.roles
         savedranks = doc["sync"]["ranks"]
         gid = doc["sync"]["gid"]
         endpoint = "guild/{0}/ranks".format(gid)
@@ -317,7 +329,8 @@ class GuildMixin:
         except APIError as e:
             return await self.error_handler(ctx, e)
         for rank in ranks:
-            discordrole = discord.utils.get(ctx.guild.roles, id=doc["sync"]["ranks"][rank["id"]])
+            discordrole = discord.utils.get(
+                ctx.guild.roles, id=doc["sync"]["ranks"][rank["id"]])
             if discordrole:
                 existingranks.append(discordrole)
                 newsaved[rank["id"]] = discordrole.id
@@ -331,17 +344,15 @@ class GuildMixin:
             try:
                 await rank.delete()
             except discord.Forbidden:
-                print("Couldn't delete rank {0}".format(rank))
+                pass
             except AttributeError:
                 pass
         for role in newranks:
             newrole = await ctx.guild.create_role(
-                    name=role, reason="GW2Bot Sync Role")
+                name=role, reason="GW2Bot Sync Role")
             newsaved[role] = newrole.id
-        await self.bot.database.set_guild(ctx.guild, {
-            "sync.ranks": newsaved
-        }, self)
-
+        await self.bot.database.set_guild(ctx.guild, {"sync.ranks": newsaved},
+                                          self)
 
     @guildsync.command(name="toggle")
     async def sync_toggle(self, ctx, on_off: bool):
@@ -381,14 +392,12 @@ class GuildMixin:
             results = await self.call_api(endpoint, leader, scopes)
             return results
         except Exception as e:
-            print(e)
             return None
 
     async def sync_members(self, doc):
         name = self.__class__.__name__
         guild = self.bot.get_guild(doc["_id"])
         guilddoc = doc["cogs"][name]["sync"]
-        print(guilddoc)
         leader = await self.bot.get_user_info(guilddoc.get("leader", False))
         gid = guilddoc.get("gid", False)
         gw2members = await self.getmembers(leader, gid)
@@ -399,6 +408,7 @@ class GuildMixin:
             rolelist.append(discordrole)
         if gw2members is not None:
             for member in guild.members:
+                rank = None
                 try:
                     keydoc = await self.fetch_key(member)
                     name = keydoc["account_name"]
@@ -415,40 +425,42 @@ class GuildMixin:
                                         await member.remove_roles(
                                             role, reason="GW2Bot Integration")
                                     except discord.Forbidden:
-                                        print(
+                                        self.log.debug(
                                             "Permissions error when trying to "
                                             "remove {0} role from {1} "
                                             "user in {2} server.".format(
                                                 role.name, member.name,
                                                 guild.name))
                                     except discord.HTTPException:
-                                        #usually because user doesn't have role
+                                        # usually because user doesn't have role
                                         pass
                                     except AttributeError:
-                                        #role no longer exists - deleted?
+                                        # role no longer exists - deleted?
                                         pass
                                 try:
                                     await member.add_roles(
                                         desiredrole,
                                         reason="GW2Bot Integration")
                                 except discord.Forbidden:
-                                    print("Permissions error when trying to "
-                                          "give {0} role to {1} user "
-                                          "in {2} server.".format(
-                                              roleobject.name, member.name,
-                                              guild.name))
+                                    self.log.debug(
+                                        "Permissions error when trying to "
+                                        "give {0} role to {1} user "
+                                        "in {2} server.".format(
+                                            desiredrole.name, member.name,
+                                            guild.name))
                                 except AttributeError:
-                                    #role no longer exists - deleted?
+                                    # role no longer exists - deleted?
                                     pass
                         except Exception as e:
-                            print("Couldn't get the role object for {0} user "
-                                  "in {1} server {2}.".format(
-                                      member.name, guild.name, e))
+                            self.log.debug(
+                                "Couldn't get the role object for {0} user "
+                                "in {1} server {2}.".format(
+                                    member.name, guild.name, e))
                 except APIKeyError:
                     pass
         else:
-            print("Unable to obtain member list for {0} server.".format(
-                guild.name))
+            self.log.debug("Unable to obtain member list for {0} server.".
+                           format(guild.name))
 
     async def synchronizer(self):
         while self is self.bot.get_cog("GuildWars2"):
