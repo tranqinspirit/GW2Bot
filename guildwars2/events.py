@@ -56,7 +56,7 @@ class EventsMixin:
         done = False
         while not done:
             for boss in self.boss_schedule:
-                if counter == 8:
+                if counter == limit:
                     done = True
                     break
                 boss_time = datetime.datetime.strptime(boss["time"],
