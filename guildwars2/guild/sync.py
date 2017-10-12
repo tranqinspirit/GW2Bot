@@ -154,7 +154,7 @@ class SyncGuild:
             "on the website https://gw2bot.info under FAQ")
         await ctx.send(guidelines)
         doc = await self.bot.database.get_guild(ctx.guild)
-        await self.sync_members(doc)
+        await self.sync_guild_ranks(doc)
 
     @guildsync.command(name="toggle")
     async def sync_toggle(self, ctx, on_off: bool):
@@ -183,7 +183,7 @@ class SyncGuild:
                 "You need to run setup before you can synchronize.")
         await ctx.trigger_typing()
         doc = await self.bot.database.get_guild(ctx.guild)
-        await self.sync_members(doc)
+        await self.sync_guild_ranks(doc)
         await ctx.send("Done.")
 
     async def getmembers(self, leader, guild_id):
