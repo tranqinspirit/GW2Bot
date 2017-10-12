@@ -537,3 +537,24 @@ class NotiifiersMixin:
             except Exception as e:
                 self.log.exception("Exception during gemtracker: ", exc_info=e)
                 await asyncio.sleep(150)
+
+    async def boss_notifier(self):
+        while self is self.bot.get_cog("GuildWars2"):
+            try:
+                name = self.__class__.__name__
+                boss = self.get_upcoming_bosses(1)[0]
+                await asyncio.sleep(boss["time"].total_seconds())
+                cursor = self.bot.database.get_guilds_cursor({
+                    "bossnotifs.on": True,
+                    "bossnotifs.channel": {
+                        "$ne": None
+                    }
+                }, self)
+                async for doc in cursor:
+                    guild = doc["cogs"][name]["daily"]
+                    timezone = guild.get("timezone")
+                    bosses = self.get_upcoming_bosses(2)
+            except Exception as e:
+                self.log.exception(e)
+                await asyncio.sleep(300)
+                continue

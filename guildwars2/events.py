@@ -69,7 +69,7 @@ class EventsMixin:
                         "name": boss["name"],
                         "time": str(boss_time.time()),
                         "waypoint": boss["waypoint"],
-                        "diff": self.format_timedelta((boss_time - time))
+                        "diff": boss_time - time
                     }
                     upcoming_bosses.append(output)
                     counter += 1
@@ -83,7 +83,7 @@ class EventsMixin:
             value = "Time: {}\nWaypoint: {}".format(boss["time"],
                                                     boss["waypoint"])
             data.add_field(
-                name="{} in {}".format(boss["name"], boss["diff"]),
+                name="{} in {}".format(boss["name"], self.format_timedelta(boss["diff"])),
                 value=value,
                 inline=False)
         data.set_author(name="Upcoming world bosses")
