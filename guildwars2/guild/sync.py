@@ -156,54 +156,6 @@ class SyncGuild:
         doc = await self.bot.database.get_guild(ctx.guild)
         await self.sync_members(doc)
 
-    async def sync_ranks(self, guild):
-        """Resynchronizes discord roles to ingame ranks."""
-        doc = await self.bot.database.get_guild(guild, self)
-        savedranks = doc["sync"]["ranks"]
-        gid = doc["sync"]["gid"]
-        endpoint = "guild/{0}/ranks".format(gid)
-        lid = doc["sync"]["leader"]
-        scopes = ["guilds"]
-        leader = await self.bot.get_user_info(lid)
-        currentranks = []
-        existingranks = []
-        newranks = []
-        newsaved = {}
-        try:
-            ranks = await self.call_api(endpoint, leader, scopes)
-        except APIError:
-            return
-        for rank in ranks:
-            try:
-                discordrole = discord.utils.get(
-                    guild.roles, id=doc["sync"]["ranks"][rank["id"]])
-                if discordrole:
-                    existingranks.append(discordrole)
-                    newsaved[rank["id"]] = discordrole.id
-                else:
-                    newranks.append(rank["id"])
-            except KeyError:
-                newranks.append(rank["id"])
-        for role_id in savedranks.values():
-            discordrole = discord.utils.get(guild.roles, id=role_id)
-            currentranks.append(discordrole)
-        todelete = set(currentranks) - set(existingranks)
-        for rank in todelete:
-            try:
-                await rank.delete()
-            except discord.Forbidden:
-                pass
-            except AttributeError:
-                pass
-        for role in newranks:
-            newrole = await guild.create_role(
-                name=role,
-                reason="GW2Bot Sync Role",
-                color=discord.Color(self.embed_color))
-            newsaved[role] = newrole.id
-        await self.bot.database.set_guild(guild, {"sync.ranks": newsaved},
-                                          self)
-
     @guildsync.command(name="toggle")
     async def sync_toggle(self, ctx, on_off: bool):
         """Toggles synchronization on/off - does not wipe settings"""
@@ -230,7 +182,6 @@ class SyncGuild:
             return await ctx.send(
                 "You need to run setup before you can synchronize.")
         await ctx.trigger_typing()
-        await self.sync_ranks(ctx)
         doc = await self.bot.database.get_guild(ctx.guild)
         await self.sync_members(doc)
         await ctx.send("Done.")
@@ -244,16 +195,58 @@ class SyncGuild:
         except Exception as e:
             return None
 
-    async def sync_members(self, doc):
+    async def sync_guild_ranks(self, doc):
         name = self.__class__.__name__
-        guild = self.bot.get_guild(doc["_id"])
         guilddoc = doc["cogs"][name]["sync"]
-        leader = await self.bot.get_user_info(guilddoc.get("leader", False))
-        gid = guilddoc.get("gid", False)
+        guild = self.bot.get_guild(doc["_id"])
+        savedranks = guilddoc["ranks"]
+        gid = guilddoc["gid"]
+        endpoint = "guild/{0}/ranks".format(gid)
+        lid = guilddoc["leader"]
+        scopes = ["guilds"]
+        leader = await self.bot.get_user_info(lid)
+        currentranks = []
+        existingranks = []
+        newranks = []
+        newsaved = {}
+        try:
+            ranks = await self.call_api(endpoint, leader, scopes)
+        except APIError:
+            return
+        for rank in ranks:
+            try:
+                discordrole = discord.utils.get(
+                    guild.roles, id=guilddoc["ranks"][rank["id"]])
+                if discordrole:
+                    existingranks.append(discordrole)
+                    newsaved[rank["id"]] = discordrole.id
+                else:
+                    newranks.append(rank["id"])
+            except KeyError:
+                newranks.append(rank["id"])
+        for role_id in savedranks.values():
+            discordrole = discord.utils.get(guild.roles, id=role_id)
+            currentranks.append(discordrole)
+        todelete = set(currentranks) - set(existingranks)
+        for rank in todelete:
+            try:
+                await rank.delete()
+            except discord.Forbidden:
+                pass
+            except AttributeError:
+                pass
+        for role in newranks:
+            newrole = await guild.create_role(
+                name=role,
+                reason="GW2Bot Sync Role",
+                color=discord.Color(self.embed_color))
+            newsaved[role] = newrole.id
+        guilddoc["ranks"] = newsaved
+        await self.bot.database.set_guild(guild, {"sync.ranks": newsaved},
+                                          self)
         gw2members = await self.getmembers(leader, gid)
-        guildranks = guilddoc.get("ranks", False)
         rolelist = []
-        for role_id in guildranks.values():
+        for role_id in newsaved.values():
             discordrole = discord.utils.get(guild.roles, id=role_id)
             rolelist.append(discordrole)
         if gw2members is not None:
@@ -320,7 +313,7 @@ class SyncGuild:
             }, self)
             async for doc in cursor:
                 try:
-                    await self.sync_members(doc)
+                    await self.sync_guild_ranks(doc)
                 except Exception as e:
                     self.log.exception(
                         "Exception during guildsync: ", exc_info=e)
