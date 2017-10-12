@@ -43,12 +43,11 @@ class SyncGuild:
     @guildsync.command(name="clear")
     async def sync_clear(self, ctx):
         """Wipes settings and turns sync off."""
-        guild = ctx.guild
-        doc = await self.bot.database.get_guild(guild, self)
+        doc = await self.bot.database.get_guild(ctx.guild, self)
         enabled = self.sync_enabled(doc)
         if not enabled:
             return await ctx.send("No settings to clear.")
-        await self.clearsync(guild)
+        await self.clearsync(ctx)
         await ctx.send("Your settings have been wiped and sync disabled.")
 
     @guildsync.command(name="setup")
