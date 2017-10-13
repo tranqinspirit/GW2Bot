@@ -48,7 +48,8 @@ class SyncGuild:
         if not enabled:
             return await ctx.send("No settings to clear.")
         await self.clearsync(ctx)
-        await ctx.send("Your settings have been wiped and sync disabled.")
+        await ctx.send("Your settings have been wiped, created roles deleted"
+                       " and sync disabled.")
 
     @guildsync.command(name="setup")
     async def sync_setup(self, ctx):
