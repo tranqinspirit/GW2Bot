@@ -42,7 +42,7 @@ class SyncGuild:
 
     @guildsync.command(name="clear")
     async def sync_clear(self, ctx):
-        """Wipes settings and turns sync off."""
+        """Wipes settings and created roles and turns sync off."""
         doc = await self.bot.database.get_guild(ctx.guild, self)
         enabled = self.sync_enabled(doc)
         if not enabled:
@@ -117,7 +117,7 @@ class SyncGuild:
             try:
                 role = await ctx.guild.create_role(
                     name=rank["id"],
-                    reason="GW2Bot Sync Role",
+                    reason="GW2Bot Sync Role [$guildsync]",
                     color=discord.Color(self.embed_color))
                 roles[rank["id"]] = role.id
             except discord.Forbidden:
@@ -196,6 +196,9 @@ class SyncGuild:
     async def sync_guild_ranks(self, doc):
         name = self.__class__.__name__
         guilddoc = doc["cogs"][name]["sync"]
+        enabled = guilddoc.get("on", False)
+        if not enabled:
+            return
         guild = self.bot.get_guild(doc["_id"])
         savedranks = guilddoc["ranks"]
         gid = guilddoc["gid"]
@@ -236,7 +239,7 @@ class SyncGuild:
         for role in newranks:
             newrole = await guild.create_role(
                 name=role,
-                reason="GW2Bot Sync Role",
+                reason="GW2Bot Sync Role [$guildsync]",
                 color=discord.Color(self.embed_color))
             newsaved[role] = newrole.id
         guilddoc["ranks"] = newsaved
@@ -264,7 +267,9 @@ class SyncGuild:
                                 for role in rolelist:
                                     try:
                                         await member.remove_roles(
-                                            role, reason="GW2Bot Integration")
+                                            role,
+                                            reason=
+                                            "GW2Bot Integration [$guildsync]")
                                     except discord.Forbidden:
                                         self.log.debug(
                                             "Permissions error when trying to "
@@ -281,7 +286,8 @@ class SyncGuild:
                                 try:
                                     await member.add_roles(
                                         desiredrole,
-                                        reason="GW2Bot Integration")
+                                        reason="GW2Bot Integration [$guildsync]"
+                                    )
                                 except discord.Forbidden:
                                     self.log.debug(
                                         "Permissions error when trying to "
